@@ -28,35 +28,38 @@ VisionPlay is a computer vision-based game controller that allows you to control
 
 ## Installation
 
-1. Clone the repository:
+1.Clone the repository:
+
 ```bash
 git clone https://github.com/yourusername/VisionPlay.git
 cd VisionPlay
 ```
 
-2. Install dependencies:
+2.Install dependencies:
+
 ```bash
 pip install -r requirements.txt
 ```
 
-3. Configure your controls in `controller_config.json` (optional)
+3.Configure your controls in `controller_config.json` (optional)
 
 ## Usage
 
-1. Run the pose controller:
+Run the pose controller:
+
 ```bash
 python pose_controller.py
 ```
 
-2. Stand in front of your webcam (ensure good lighting)
-3. Use the following gestures:
+1. Stand in front of your webcam (ensure good lighting)
+2. Use the following gestures:
    - Extend right arm for right punch
    - Extend left arm for left punch
    - Raise right arm for right kick
    - Raise left arm for left kick
    - Extend both arms for special move
    - Raise both arms for blocking
-4. Press ESC to exit
+3. Press ESC to exit
 
 ## Configuration
 
@@ -78,6 +81,7 @@ You can customize controls and thresholds in `controller_config.json`:
 ## Logging
 
 The application logs events to `pose_controller.log`, including:
+
 - Initialization status
 - Error messages
 - Performance metrics
