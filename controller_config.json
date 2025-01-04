@@ -1,0 +1,20 @@
+{
+    "controls": {
+        "right_punch": "p",
+        "left_punch": "o",
+        "right_kick": "k",
+        "left_kick": "l",
+        "special_move": "s",
+        "block": "b"
+    },
+    "thresholds": {
+        "visibility": 0.7,
+        "punch_distance": 110,
+        "kick_height": 0.8
+    },
+    "display": {
+        "width": 640,
+        "height": 480,
+        "show_debug": true
+    }
+}
