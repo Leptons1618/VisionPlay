@@ -5,6 +5,8 @@ import pyautogui
 import json
 import logging
 import time
+import signal
+import sys
 from dataclasses import dataclass
 from typing import Dict, Optional, Tuple
 
@@ -32,6 +34,10 @@ class PoseBasedController:
         """Initialize the controller with optional config file"""
         logger.info("Initializing PoseBasedController")
         try:
+            # Setup signal handler
+            signal.signal(signal.SIGINT, self.signal_handler)
+            self.is_running = True
+
             self.pose = mp.solutions.pose
             self.drawing = mp.solutions.drawing_utils
             self.obj = self.pose.Pose(
@@ -56,10 +62,21 @@ class PoseBasedController:
             # Performance monitoring
             self.frame_count = 0
             self.start_time = time.time()
+
+            # Add overlay text settings
+            self.overlay_font = cv2.FONT_HERSHEY_SIMPLEX
+            self.text_color = (0, 255, 0)  # Green
+            self.text_color_warning = (0, 165, 255)  # Orange
+            self.line_spacing = 30
             
         except Exception as e:
             logger.error(f"Initialization failed: {str(e)}")
             raise
+
+    def signal_handler(self, signum, frame):
+        """Handle interrupt signals"""
+        logger.info("Interrupt received, shutting down...")
+        self.is_running = False
 
     def load_config(self, config_file: str) -> None:
         """Load control configuration from JSON file"""
@@ -153,17 +170,51 @@ class PoseBasedController:
             logger.error(f"Error detecting gestures: {str(e)}")
             return {}
 
+    def add_overlay_text(self, frame: np.ndarray, gestures: Dict[str, bool]) -> np.ndarray:
+        """Add overlay text to frame"""
+        # Add title and FPS
+        cv2.putText(frame, "VisionPlay Controller", (10, 30),
+                    self.overlay_font, 0.7, self.text_color, 2)
+        
+        # Calculate and display FPS
+        elapsed_time = time.time() - self.start_time
+        fps = self.frame_count / elapsed_time if elapsed_time > 0 else 0
+        cv2.putText(frame, f"FPS: {int(fps)}", (10, 60),
+                    self.overlay_font, 0.6, self.text_color, 1)
+
+        # Display controls info
+        controls_text = "Controls: ESC - Exit | CTRL+C - Quit"
+        cv2.putText(frame, controls_text, (10, frame.shape[0] - 20),
+                    self.overlay_font, 0.5, self.text_color, 1)
+
+        # Display active gestures
+        y_pos = 90
+        if any(gestures.values()):
+            cv2.putText(frame, "Active Gestures:", (10, y_pos),
+                        self.overlay_font, 0.6, self.text_color, 1)
+            y_pos += self.line_spacing
+            
+            for action, is_active in gestures.items():
+                if is_active:
+                    cv2.putText(frame, f"- {action.replace('_', ' ').title()}",
+                              (20, y_pos), self.overlay_font, 0.6, self.text_color, 1)
+                    y_pos += self.line_spacing
+        
+        # Add visibility warning if needed
+        if not any(gestures.values()):
+            warning_text = "No poses detected - Please stand in frame"
+            cv2.putText(frame, warning_text, (frame.shape[1]//4, frame.shape[0]//2),
+                        self.overlay_font, 0.7, self.text_color_warning, 2)
+        
+        return frame
+
     def run(self) -> None:
         """Main loop for the controller"""
         logger.info("Starting pose controller")
         try:
-            while True:
+            while self.is_running:
                 self.frame_count += 1
-                if self.frame_count % 100 == 0:  # Log FPS every 100 frames
-                    elapsed_time = time.time() - self.start_time
-                    fps = self.frame_count / elapsed_time
-                    logger.info(f"Current FPS: {fps:.2f}")
-
+                
                 ret, frame = self.cap.read()
                 if not ret:
                     logger.error("Failed to capture frame")
@@ -172,28 +223,19 @@ class PoseBasedController:
                 # Process frame
                 rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                 results = self.obj.process(rgb_frame)
-
+                
+                gestures = {}
                 if results.pose_landmarks:
-                    # Draw landmarks
                     self.drawing.draw_landmarks(frame, results.pose_landmarks, 
                                              self.pose.POSE_CONNECTIONS)
-                    
-                    # Detect and handle gestures
                     gestures = self.detect_gestures(results.pose_landmarks)
                     for action, is_active in gestures.items():
                         self.handle_key_state(action, is_active)
 
-                    # Display active gestures
-                    y_pos = 30
-                    for action, is_active in gestures.items():
-                        if is_active:
-                            cv2.putText(frame, action, (10, y_pos),
-                                      cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
-                            y_pos += 20
-
-                # Display frame
+                # Add overlay text and flip frame
+                frame = self.add_overlay_text(frame, gestures)
                 frame = cv2.flip(frame, 1)
-                cv2.imshow("Pose Controller", frame)
+                cv2.imshow("VisionPlay Controller", frame)
 
                 if cv2.waitKey(1) == 27:  # ESC key
                     logger.info("ESC pressed, stopping controller")
@@ -224,5 +266,7 @@ if __name__ == "__main__":
     try:
         controller = PoseBasedController()
         controller.run()
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received, shutting down...")
     except Exception as e:
         logger.critical(f"Fatal error: {str(e)}")
